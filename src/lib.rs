@@ -1,2 +1,2 @@
 #![no_std]
-mod meow;
+mod kitten;
