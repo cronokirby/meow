@@ -219,7 +219,13 @@ impl Meow {
         };
         let old_begin = self.pos_begin;
         self.pos_begin = self.pos + 1;
+
         self.absorb(&[old_begin, flags]);
+
+        let force_f = (FLAGS & (FLAG_C | FLAG_K)) != 0;
+        if force_f && self.pos != 0 {
+            self.run_f();
+        }
     }
 
     fn operate<const FLAGS: Flags>(&mut self, data: &[u8], more: bool) {
