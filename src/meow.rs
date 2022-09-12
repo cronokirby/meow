@@ -113,24 +113,24 @@ impl Meow {
         self.operate::<FLAGS>(data, more);
     }
 
-    pub fn send_enc(&mut self, data: &[u8], more: bool) {
+    pub fn send_enc(&mut self, data: &mut [u8], more: bool) {
         const FLAGS: Flags = FLAG_A | FLAG_C | FLAG_T;
-        self.operate::<FLAGS>(data, more);
+        self.operate_output::<FLAGS>(data, more);
     }
 
-    pub fn recv_enc(&mut self, data: &[u8], more: bool) {
+    pub fn recv_enc(&mut self, data: &mut [u8], more: bool) {
         const FLAGS: Flags = FLAG_I | FLAG_A | FLAG_C | FLAG_T;
-        self.operate::<FLAGS>(data, more);
+        self.operate_output::<FLAGS>(data, more);
     }
 
-    pub fn send_mac(&mut self, data: &[u8], more: bool) {
+    pub fn send_mac(&mut self, data: &mut [u8], more: bool) {
         const FLAGS: Flags = FLAG_C | FLAG_T;
-        self.operate::<FLAGS>(data, more);
+        self.operate_output::<FLAGS>(data, more);
     }
 
-    pub fn recv_mac(&mut self, data: &[u8], more: bool) {
+    pub fn recv_mac(&mut self, data: &mut [u8], more: bool) {
         const FLAGS: Flags = FLAG_I | FLAG_C | FLAG_T;
-        self.operate::<FLAGS>(data, more);
+        self.operate_output::<FLAGS>(data, more);
     }
 
     pub fn ratchet(&mut self) {
