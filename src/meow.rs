@@ -63,7 +63,7 @@ pub struct Meow {
 }
 
 impl Meow {
-    pub fn new() -> Self {
+    pub fn new(protocol: &[u8]) -> Self {
         let mut state = AlignedKittenState([0u8; STATE_SIZE_U8]);
         // "5.1:
         // The initial state of the object is as follows:
@@ -76,13 +76,69 @@ impl Meow {
         state[6..6 + MEOW_CONTEXT.len()].copy_from_slice(MEOW_CONTEXT);
         state.permute();
 
-        Self {
+        let mut out = Self {
             state,
             pos: 0,
             pos_begin: 0,
             role: Role::Undecided,
             cur_flags: 0,
-        }
+        };
+
+        out.meta_ad(protocol, false);
+
+        out
+    }
+
+    pub fn ad(&mut self, data: &[u8], more: bool) {
+        self.operate::<FLAG_A>(data, more);
+    }
+
+    pub fn meta_ad(&mut self, data: &[u8], more: bool) {
+        const FLAGS: Flags = FLAG_M | FLAG_A;
+        self.operate::<FLAGS>(data, more);
+    }
+
+    pub fn key(&mut self, data: &[u8], more: bool) {
+        const FLAGS: Flags = FLAG_A | FLAG_C;
+        self.operate::<FLAGS>(data, more);
+    }
+
+    pub fn send_clr(&mut self, data: &[u8], more: bool) {
+        const FLAGS: Flags = FLAG_A | FLAG_T;
+        self.operate::<FLAGS>(data, more);
+    }
+
+    pub fn recv_clr(&mut self, data: &[u8], more: bool) {
+        const FLAGS: Flags = FLAG_I | FLAG_A | FLAG_T;
+        self.operate::<FLAGS>(data, more);
+    }
+
+    pub fn send_enc(&mut self, data: &[u8], more: bool) {
+        const FLAGS: Flags = FLAG_A | FLAG_C | FLAG_T;
+        self.operate::<FLAGS>(data, more);
+    }
+
+    pub fn recv_enc(&mut self, data: &[u8], more: bool) {
+        const FLAGS: Flags = FLAG_I | FLAG_A | FLAG_C | FLAG_T;
+        self.operate::<FLAGS>(data, more);
+    }
+
+    pub fn send_mac(&mut self, data: &[u8], more: bool) {
+        const FLAGS: Flags = FLAG_C | FLAG_T;
+        self.operate::<FLAGS>(data, more);
+    }
+
+    pub fn recv_mac(&mut self, data: &[u8], more: bool) {
+        const FLAGS: Flags = FLAG_I | FLAG_C | FLAG_T;
+        self.operate::<FLAGS>(data, more);
+    }
+
+    pub fn ratchet(&mut self) {
+        self.operate_ratchet::<FLAG_C>(SECURITY_PARAM / 8, false);
+    }
+
+    pub fn ratchet_many(&mut self, len: usize, more: bool) {
+        self.operate_ratchet::<FLAG_C>(len, more);
     }
 }
 
