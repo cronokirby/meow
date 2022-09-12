@@ -252,9 +252,9 @@ impl Meow {
         self.begin_op::<FLAGS>(more);
 
         if FLAGS & (FLAG_C | FLAG_I | FLAG_T) == (FLAG_C | FLAG_T) {
-            self.duplex::<true, false>(data);
-        } else if FLAGS & FLAG_C != 0 {
             self.duplex::<false, true>(data);
+        } else if FLAGS & FLAG_C != 0 {
+            self.duplex::<true, false>(data);
         } else {
             self.duplex::<false, false>(data);
         }
