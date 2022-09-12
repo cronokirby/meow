@@ -36,7 +36,7 @@ enum Role {
 impl Role {
     fn to_flag(self) -> Flags {
         match self {
-            Role::Undecided => panic!("undecided rule was converted to flag."),
+            Role::Undecided => panic!("Undecided role was converted to flag."),
             Role::Initiator => 0,
             Role::Responder => 1,
         }
@@ -59,6 +59,7 @@ pub struct Meow {
     pos: u8,
     pos_begin: u8,
     role: Role,
+    cur_flags: Flags,
 }
 
 impl Meow {
@@ -80,6 +81,7 @@ impl Meow {
             pos: 0,
             pos_begin: 0,
             role: Role::Undecided,
+            cur_flags: 0,
         }
     }
 }
@@ -95,19 +97,62 @@ impl Meow {
         self.pos_begin = 0;
     }
 
+    #[inline(always)]
+    fn advance_pos(&mut self) {
+        self.pos += 1;
+        if self.pos == MEOW_R {
+            self.run_f();
+        }
+    }
+
     /// Absorb some data into this sponge.
     fn absorb(&mut self, data: &[u8]) {
-        for x in data {
-            self.state[self.pos as usize] ^= x;
-            self.pos += 1;
-            if self.pos == MEOW_R {
-                self.run_f();
+        for b in data {
+            self.state[self.pos as usize] ^= b;
+            self.advance_pos();
+        }
+    }
+
+    fn overwrite(&mut self, data: &[u8]) {
+        for &b in data {
+            self.state[self.pos as usize] = b;
+            self.advance_pos();
+        }
+    }
+
+    fn zero_out(&mut self, len: usize) {
+        for _ in 0..len {
+            self.state[self.pos as usize] = 0;
+            self.advance_pos();
+        }
+    }
+
+    fn duplex<const CBEFORE: bool, const CAFTER: bool>(&mut self, data: &mut [u8]) {
+        assert!(!(CBEFORE && CAFTER));
+        for b in data {
+            let pos = self.pos as usize;
+            if CBEFORE {
+                *b ^= self.state[pos];
             }
+            self.state[pos] ^= *b;
+            if CAFTER {
+                *b = self.state[pos];
+            }
+            self.advance_pos();
         }
     }
 
     /// See: 7.3. Beginning an Operation.
-    fn begin_op<const FLAGS: Flags>(&mut self) {
+    fn begin_op<const FLAGS: Flags>(&mut self, more: bool) {
+        if more {
+            assert_eq!(
+                self.cur_flags, FLAGS,
+                "Cannot continue {:#b} with {:#b}.",
+                self.cur_flags, FLAGS
+            );
+            return;
+        }
+
         let flags = if FLAGS & FLAG_T != 0 {
             if let Role::Undecided = self.role {
                 self.role = Role::from(FLAGS & FLAG_I);
@@ -119,5 +164,43 @@ impl Meow {
         let old_begin = self.pos_begin;
         self.pos_begin = self.pos + 1;
         self.absorb(&[old_begin, flags]);
+    }
+
+    fn operate<const FLAGS: Flags>(&mut self, data: &[u8], more: bool) {
+        assert!(FLAGS & FLAG_K == 0, "Flag K is not implemented.");
+
+        self.begin_op::<FLAGS>(more);
+
+        assert!(
+            FLAGS & (FLAG_C | FLAG_T | FLAG_I) != (FLAG_C | FLAG_T),
+            "No immutable operations with flags {:#b}.",
+            FLAGS
+        );
+
+        if FLAGS & FLAG_C != 0 {
+            self.overwrite(data);
+        } else {
+            self.absorb(data);
+        }
+    }
+
+    fn operate_output<const FLAGS: Flags>(&mut self, data: &mut [u8], more: bool) {
+        assert!(FLAGS & FLAG_K == 0, "Flag K is not implemented.");
+
+        self.begin_op::<FLAGS>(more);
+
+        if FLAGS & (FLAG_C | FLAG_I | FLAG_T) == (FLAG_C | FLAG_T) {
+            self.duplex::<true, false>(data);
+        } else if FLAGS & FLAG_C != 0 {
+            self.duplex::<false, true>(data);
+        } else {
+            self.duplex::<false, false>(data);
+        }
+    }
+
+    fn operate_ratchet<const FLAGS: Flags>(&mut self, len: usize, more: bool) {
+        self.begin_op::<FLAGS>(more);
+
+        self.zero_out(len);
     }
 }
