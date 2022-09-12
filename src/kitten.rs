@@ -3,9 +3,9 @@ use core::ops::{Deref, DerefMut};
 use zeroize::Zeroize;
 
 /// The number of words in our permutation state.
-const STATE_SIZE_U64: usize = 25;
+pub const STATE_SIZE_U64: usize = 25;
 /// The number of bytes in our permutation state.
-const STATE_SIZE_U8: usize = STATE_SIZE_U64 * 8;
+pub const STATE_SIZE_U8: usize = STATE_SIZE_U64 * 8;
 
 /// The Kit-Ten permutation.
 ///
@@ -21,6 +21,7 @@ fn kitten(state: &mut [u64; STATE_SIZE_U64]) {
 /// of bytes which is correctly aligned, so that it can be easily transmuted
 /// into a buffer of words, and
 #[derive(Clone, Zeroize)]
+#[cfg_attr(test, derive(Debug, PartialEq))]
 #[repr(align(8))]
 pub struct AlignedKittenState(pub [u8; STATE_SIZE_U8]);
 
@@ -56,5 +57,18 @@ impl Deref for AlignedKittenState {
 impl DerefMut for AlignedKittenState {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::{AlignedKittenState, STATE_SIZE_U8};
+
+    #[test]
+    fn test_permute_changes_state() {
+        let data0 = AlignedKittenState([0u8; STATE_SIZE_U8]);
+        let mut data1 = data0.clone();
+        data1.permute();
+        assert_ne!(data0, data1);
     }
 }
