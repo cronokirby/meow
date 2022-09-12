@@ -1,5 +1,7 @@
 # Kangarobe
 
-<img src="logo.png" style="width: 50%">
+<p align="center">
+  <img src="logo.png" style="width: 40%">
+</p>
 
 Shaving some yaks, kanging some roos...
