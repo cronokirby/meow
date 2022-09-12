@@ -1,7 +1,7 @@
-# Kangarobe
+# Meow
 
 <p align="center">
-  <img src="logo.png" style="width: 40%">
+  <img src="logo.jpg" style="width: 40%">
 </p>
 
-Shaving some yaks, kanging some roos...
+meow meow meow meow meow
