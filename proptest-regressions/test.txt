@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 6dda00ee9a56a65e0a3adba288398f86b70a6a4aaa50dba86c94ba4f019fe1bb # shrinks to c0 = Commands { protocol: [], commands: [] }, c1 = Commands { protocol: [], commands: [Mac(32)] }

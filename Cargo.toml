@@ -7,3 +7,6 @@ edition = "2021"
 keccak = "0.1.2"
 subtle = "2.4.1"
 zeroize = { version = "1.5.7", features = ["derive"] }
+
+[dev-dependencies]
+proptest = "1.0.0"
