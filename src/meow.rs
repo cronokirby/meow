@@ -69,6 +69,7 @@ fn check_zero(data: &[u8]) -> Result<(), MacError> {
     }
 }
 
+#[cfg_attr(test, derive(Debug))]
 #[derive(Clone, ZeroizeOnDrop)]
 pub struct Meow {
     state: AlignedKittenState,
@@ -311,21 +312,52 @@ mod test {
 
     #[test]
     fn test_basic_encryption() {
-        let key = b"my super secret key";
-        let message0 = b"hello world!";
-        let mut encrypted = message0.to_owned();
+        let key = [0xAA; 32];
+        let message0 = [0xFF; MEOW_R as usize];
+
+        let mut encrypted = message0;
         {
             let mut meow = Meow::new(b"test protocol");
-            meow.key(key, false);
+            meow.key(&key, false);
             meow.send_enc(&mut encrypted, false);
         };
-        assert_ne!(message0, &encrypted);
+
+        assert_ne!(message0, encrypted);
+
         let mut message1 = encrypted;
         {
             let mut meow = Meow::new(b"test protocol");
-            meow.key(key, false);
+            meow.key(&key, false);
             meow.recv_enc(&mut message1, false);
         };
-        assert_eq!(message0, &message1);
+
+        assert_eq!(message0, message1);
+    }
+
+    #[test]
+    fn test_encryption_with_nonce() {
+        let key = [0xAA; 32];
+        let nonce = [0xBB; 32];
+        let message0 = [0xFF; 4];
+
+        let mut encrypted = message0.to_owned();
+        {
+            let mut meow = Meow::new(b"test protocol");
+            meow.key(&key, false);
+            meow.send_clr(&nonce, false);
+            meow.send_enc(&mut encrypted, false);
+        };
+
+        assert_ne!(message0, encrypted);
+
+        let mut message1 = encrypted.to_owned();
+        {
+            let mut meow = Meow::new(b"test protocol");
+            meow.key(&key, false);
+            meow.recv_clr(&nonce, false);
+            meow.recv_enc(&mut message1, false);
+        };
+
+        assert_eq!(message0, message1);
     }
 }
