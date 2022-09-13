@@ -57,6 +57,18 @@ impl From<u8> for Role {
 #[derive(Clone, Copy, Debug)]
 pub struct MacError;
 
+fn check_zero(data: &[u8]) -> Result<(), MacError> {
+    let mut ok = Choice::from(1);
+    for b in data {
+        ok &= b.ct_eq(&0u8);
+    }
+    if !bool::from(ok) {
+        Err(MacError)
+    } else {
+        Ok(())
+    }
+}
+
 #[derive(Clone, ZeroizeOnDrop)]
 pub struct Meow {
     state: AlignedKittenState,
@@ -113,8 +125,18 @@ impl Meow {
         self.absorb(data);
     }
 
+    pub fn meta_send_clr(&mut self, data: &[u8], more: bool) {
+        self.begin_op(FLAG_M | FLAG_A | FLAG_T, more);
+        self.absorb(data);
+    }
+
     pub fn recv_clr(&mut self, data: &[u8], more: bool) {
         self.begin_op(FLAG_I | FLAG_A | FLAG_T, more);
+        self.absorb(data);
+    }
+
+    pub fn meta_recv_clr(&mut self, data: &[u8], more: bool) {
+        self.begin_op(FLAG_M | FLAG_I | FLAG_A | FLAG_T, more);
         self.absorb(data);
     }
 
@@ -123,8 +145,18 @@ impl Meow {
         self.absorb_and_set(data);
     }
 
+    pub fn meta_send_enc(&mut self, data: &mut [u8], more: bool) {
+        self.begin_op(FLAG_M | FLAG_A | FLAG_C | FLAG_T, more);
+        self.absorb_and_set(data);
+    }
+
     pub fn recv_enc(&mut self, data: &mut [u8], more: bool) {
         self.begin_op(FLAG_I | FLAG_A | FLAG_C | FLAG_T, more);
+        self.exchange(data);
+    }
+
+    pub fn meta_recv_enc(&mut self, data: &mut [u8], more: bool) {
+        self.begin_op(FLAG_M | FLAG_I | FLAG_A | FLAG_C | FLAG_T, more);
         self.exchange(data);
     }
 
@@ -133,19 +165,21 @@ impl Meow {
         self.copy(data);
     }
 
+    pub fn meta_send_mac(&mut self, data: &mut [u8]) {
+        self.begin_op(FLAG_M | FLAG_C | FLAG_T, false);
+        self.copy(data);
+    }
+
     pub fn recv_mac(&mut self, data: &mut [u8]) -> Result<(), MacError> {
         self.begin_op(FLAG_I | FLAG_C | FLAG_T, false);
         self.exchange(data);
-        // Now, check the MAC in constant time.
-        let mut ok = Choice::from(1);
-        for b in data {
-            ok &= b.ct_eq(&0u8);
-        }
-        if !bool::from(ok) {
-            Err(MacError)
-        } else {
-            Ok(())
-        }
+        check_zero(data)
+    }
+
+    pub fn meta_recv_mac(&mut self, data: &mut [u8]) -> Result<(), MacError> {
+        self.begin_op(FLAG_M | FLAG_I | FLAG_C | FLAG_T, false);
+        self.exchange(data);
+        check_zero(data)
     }
 
     pub fn prf(&mut self, data: &mut [u8], more: bool) {
