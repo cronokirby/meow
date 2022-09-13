@@ -115,7 +115,7 @@ proptest! {
         // or they should be different, and the output should be different too.
         if c0 == c1 {
             assert_eq!(out0, out1);
-        } else {
+        } else if !(out0.is_empty() && out1.is_empty()) {
             assert_ne!(out0, out1);
         }
     }
