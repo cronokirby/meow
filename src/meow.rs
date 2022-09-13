@@ -213,7 +213,7 @@ impl Meow {
             if let Role::Undecided = self.role {
                 self.role = Role::from(FLAGS & FLAG_I);
             }
-            FLAGS | self.role.to_flag()
+            FLAGS ^ self.role.to_flag()
         } else {
             FLAGS
         };
