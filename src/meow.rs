@@ -304,3 +304,28 @@ impl Meow {
         }
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_basic_encryption() {
+        let key = b"my super secret key";
+        let message0 = b"hello world!";
+        let mut encrypted = message0.to_owned();
+        {
+            let mut meow = Meow::new(b"test protocol");
+            meow.key(key, false);
+            meow.send_enc(&mut encrypted, false);
+        };
+        assert_ne!(message0, &encrypted);
+        let mut message1 = encrypted;
+        {
+            let mut meow = Meow::new(b"test protocol");
+            meow.key(key, false);
+            meow.recv_enc(&mut message1, false);
+        };
+        assert_eq!(message0, &message1);
+    }
+}

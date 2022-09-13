@@ -1,5 +1,5 @@
-#![no_std]
+#![cfg_attr(not(test), no_std)]
 mod kitten;
 mod meow;
 
-pub use meow::Meow;
+pub use crate::meow::{Meow, MacError};
