@@ -360,4 +360,35 @@ mod test {
 
         assert_eq!(message0, message1);
     }
+
+    #[test]
+    fn test_authenticated_encryption() {
+        let key = [0xAA; 32];
+        let nonce = [0xBB; 32];
+        let message0 = [0xFF; 4];
+
+        let mut mac = [0u8; 32];
+
+        let mut encrypted = message0.to_owned();
+        {
+            let mut meow = Meow::new(b"test protocol");
+            meow.key(&key, false);
+            meow.send_clr(&nonce, false);
+            meow.send_enc(&mut encrypted, false);
+            meow.send_mac(&mut mac);
+        };
+
+        assert_ne!(message0, encrypted);
+
+        let mut message1 = encrypted.to_owned();
+        {
+            let mut meow = Meow::new(b"test protocol");
+            meow.key(&key, false);
+            meow.recv_clr(&nonce, false);
+            meow.recv_enc(&mut message1, false);
+            assert!(meow.recv_mac(&mut mac).is_ok());
+        };
+
+        assert_eq!(message0, message1);
+    }
 }
