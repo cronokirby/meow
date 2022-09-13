@@ -1,5 +1,6 @@
 // See: https://strobe.sourceforge.io/specs for the specification for STROBE.
 use crate::kitten::{AlignedKittenState, STATE_SIZE_U8};
+use subtle::{Choice, ConstantTimeEq};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 /// We use a hard coded security parameter of 128 bits.
@@ -52,6 +53,9 @@ impl From<u8> for Role {
         }
     }
 }
+
+#[derive(Clone, Copy, Debug)]
+pub struct MacError;
 
 #[derive(Clone, ZeroizeOnDrop)]
 pub struct Meow {
@@ -124,14 +128,24 @@ impl Meow {
         self.exchange(data);
     }
 
-    pub fn send_mac(&mut self, data: &mut [u8], more: bool) {
-        self.begin_op(FLAG_C | FLAG_T, more);
+    pub fn send_mac(&mut self, data: &mut [u8]) {
+        self.begin_op(FLAG_C | FLAG_T, false);
         self.copy(data);
     }
 
-    pub fn recv_mac(&mut self, data: &mut [u8], more: bool) {
-        self.begin_op(FLAG_I | FLAG_C | FLAG_T, more);
+    pub fn recv_mac(&mut self, data: &mut [u8]) -> Result<(), MacError> {
+        self.begin_op(FLAG_I | FLAG_C | FLAG_T, false);
         self.exchange(data);
+        // Now, check the MAC in constant time.
+        let mut ok = Choice::from(1);
+        for b in data {
+            ok &= b.ct_eq(&0u8);
+        }
+        if !bool::from(ok) {
+            Err(MacError)
+        } else {
+            Ok(())
+        }
     }
 
     pub fn prf(&mut self, data: &mut [u8], more: bool) {
