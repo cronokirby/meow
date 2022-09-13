@@ -90,55 +90,62 @@ impl Meow {
     }
 
     pub fn ad(&mut self, data: &[u8], more: bool) {
-        self.operate::<FLAG_A>(data, more);
+        self.begin_op(FLAG_A, more);
+        self.absorb(data);
     }
 
     pub fn meta_ad(&mut self, data: &[u8], more: bool) {
-        const FLAGS: Flags = FLAG_M | FLAG_A;
-        self.operate::<FLAGS>(data, more);
+        self.begin_op(FLAG_M | FLAG_A, more);
+        self.absorb(data);
     }
 
     pub fn key(&mut self, data: &[u8], more: bool) {
-        const FLAGS: Flags = FLAG_A | FLAG_C;
-        self.operate::<FLAGS>(data, more);
+        self.begin_op(FLAG_A | FLAG_C, more);
+        self.overwrite(data);
     }
 
     pub fn send_clr(&mut self, data: &[u8], more: bool) {
-        const FLAGS: Flags = FLAG_A | FLAG_T;
-        self.operate::<FLAGS>(data, more);
+        self.begin_op(FLAG_A | FLAG_T, more);
+        self.absorb(data);
     }
 
     pub fn recv_clr(&mut self, data: &[u8], more: bool) {
-        const FLAGS: Flags = FLAG_I | FLAG_A | FLAG_T;
-        self.operate::<FLAGS>(data, more);
+        self.begin_op(FLAG_I | FLAG_A | FLAG_T, more);
+        self.absorb(data);
     }
 
     pub fn send_enc(&mut self, data: &mut [u8], more: bool) {
-        const FLAGS: Flags = FLAG_A | FLAG_C | FLAG_T;
-        self.operate_output::<FLAGS>(data, more);
+        self.begin_op(FLAG_A | FLAG_C | FLAG_T, more);
+        self.absorb_and_set(data);
     }
 
     pub fn recv_enc(&mut self, data: &mut [u8], more: bool) {
-        const FLAGS: Flags = FLAG_I | FLAG_A | FLAG_C | FLAG_T;
-        self.operate_output::<FLAGS>(data, more);
+        self.begin_op(FLAG_I | FLAG_A | FLAG_C | FLAG_T, more);
+        self.exchange(data);
     }
 
     pub fn send_mac(&mut self, data: &mut [u8], more: bool) {
-        const FLAGS: Flags = FLAG_C | FLAG_T;
-        self.operate_output::<FLAGS>(data, more);
+        self.begin_op(FLAG_C | FLAG_T, more);
+        self.copy(data);
     }
 
     pub fn recv_mac(&mut self, data: &mut [u8], more: bool) {
-        const FLAGS: Flags = FLAG_I | FLAG_C | FLAG_T;
-        self.operate_output::<FLAGS>(data, more);
+        self.begin_op(FLAG_I | FLAG_C | FLAG_T, more);
+        self.exchange(data);
+    }
+
+    pub fn prf(&mut self, data: &mut [u8], more: bool) {
+        self.begin_op(FLAG_I | FLAG_A | FLAG_C, more);
+        self.squeeze(data);
     }
 
     pub fn ratchet(&mut self) {
-        self.operate_ratchet::<FLAG_C>(SECURITY_PARAM / 8, false);
+        self.ratchet_many(SECURITY_PARAM / 8, false)
     }
 
     pub fn ratchet_many(&mut self, len: usize, more: bool) {
-        self.operate_ratchet::<FLAG_C>(len, more);
+        self.begin_op(FLAG_C, more);
+        self.zero_out(len);
     }
 }
 
@@ -169,6 +176,14 @@ impl Meow {
         }
     }
 
+    fn absorb_and_set(&mut self, data: &mut [u8]) {
+        for b in data {
+            self.state[self.pos as usize] ^= *b;
+            *b = self.state[self.pos as usize];
+            self.advance_pos();
+        }
+    }
+
     fn overwrite(&mut self, data: &[u8]) {
         for &b in data {
             self.state[self.pos as usize] = b;
@@ -183,86 +198,61 @@ impl Meow {
         }
     }
 
-    fn duplex<const CBEFORE: bool, const CAFTER: bool>(&mut self, data: &mut [u8]) {
-        assert!(!(CBEFORE && CAFTER));
+    fn exchange(&mut self, data: &mut [u8]) {
         for b in data {
             let pos = self.pos as usize;
-            if CBEFORE {
-                *b ^= self.state[pos];
-            }
+            *b ^= self.state[pos];
             self.state[pos] ^= *b;
-            if CAFTER {
-                *b = self.state[pos];
-            }
+            self.advance_pos();
+        }
+    }
+
+    fn copy(&mut self, data: &mut [u8]) {
+        for b in data {
+            let pos = self.pos as usize;
+            *b = self.state[pos];
+            self.advance_pos();
+        }
+    }
+
+    fn squeeze(&mut self, data: &mut [u8]) {
+        for b in data {
+            let pos = self.pos as usize;
+            *b = self.state[pos];
+            self.state[pos] = 0;
             self.advance_pos();
         }
     }
 
     /// See: 7.3. Beginning an Operation.
-    fn begin_op<const FLAGS: Flags>(&mut self, more: bool) {
+    fn begin_op(&mut self, flags: Flags, more: bool) {
         if more {
             assert_eq!(
-                self.cur_flags, FLAGS,
+                self.cur_flags, flags,
                 "Cannot continue {:#b} with {:#b}.",
-                self.cur_flags, FLAGS
+                self.cur_flags, flags
             );
             return;
         }
+        self.cur_flags = flags;
 
-        let flags = if FLAGS & FLAG_T != 0 {
+        let flags = if flags & FLAG_T != 0 {
             if let Role::Undecided = self.role {
-                self.role = Role::from(FLAGS & FLAG_I);
+                self.role = Role::from(flags & FLAG_I);
             }
-            FLAGS ^ self.role.to_flag()
+            flags ^ self.role.to_flag()
         } else {
-            FLAGS
+            flags
         };
+
         let old_begin = self.pos_begin;
         self.pos_begin = self.pos + 1;
 
         self.absorb(&[old_begin, flags]);
 
-        let force_f = (FLAGS & (FLAG_C | FLAG_K)) != 0;
+        let force_f = (flags & (FLAG_C | FLAG_K)) != 0;
         if force_f && self.pos != 0 {
             self.run_f();
         }
-    }
-
-    fn operate<const FLAGS: Flags>(&mut self, data: &[u8], more: bool) {
-        assert!(FLAGS & FLAG_K == 0, "Flag K is not implemented.");
-
-        self.begin_op::<FLAGS>(more);
-
-        assert!(
-            FLAGS & (FLAG_C | FLAG_T | FLAG_I) != (FLAG_C | FLAG_T),
-            "No immutable operations with flags {:#b}.",
-            FLAGS
-        );
-
-        if FLAGS & FLAG_C != 0 {
-            self.overwrite(data);
-        } else {
-            self.absorb(data);
-        }
-    }
-
-    fn operate_output<const FLAGS: Flags>(&mut self, data: &mut [u8], more: bool) {
-        assert!(FLAGS & FLAG_K == 0, "Flag K is not implemented.");
-
-        self.begin_op::<FLAGS>(more);
-
-        if FLAGS & (FLAG_C | FLAG_I | FLAG_T) == (FLAG_C | FLAG_T) {
-            self.duplex::<false, true>(data);
-        } else if FLAGS & FLAG_C != 0 {
-            self.duplex::<true, false>(data);
-        } else {
-            self.duplex::<false, false>(data);
-        }
-    }
-
-    fn operate_ratchet<const FLAGS: Flags>(&mut self, len: usize, more: bool) {
-        self.begin_op::<FLAGS>(more);
-
-        self.zero_out(len);
     }
 }
