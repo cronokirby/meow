@@ -338,7 +338,7 @@ mod test {
     fn test_encryption_with_nonce() {
         let key = [0xAA; 32];
         let nonce = [0xBB; 32];
-        let message0 = [0xFF; 4];
+        let message0 = [0xFF; MEOW_R as usize];
 
         let mut encrypted = message0.to_owned();
         {
@@ -365,7 +365,7 @@ mod test {
     fn test_authenticated_encryption() {
         let key = [0xAA; 32];
         let nonce = [0xBB; 32];
-        let message0 = [0xFF; 4];
+        let message0 = [0xFF; MEOW_R as usize];
 
         let mut mac = [0u8; 32];
 
@@ -390,5 +390,24 @@ mod test {
         };
 
         assert_eq!(message0, message1);
+    }
+
+    #[test]
+    fn test_prf() {
+        let mut hash0 = [0u8; 32];
+        {
+            let mut meow = Meow::new(b"test protocol");
+            meow.ad(b"hello A", false);
+            meow.prf(&mut hash0, false);
+        };
+
+        let mut hash1 = [0u8; 32];
+        {
+            let mut meow = Meow::new(b"test protocol");
+            meow.ad(b"hello B", false);
+            meow.prf(&mut hash1, false);
+        };
+
+        assert_ne!(hash0, hash1);
     }
 }
