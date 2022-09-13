@@ -380,13 +380,17 @@ mod test {
 
         assert_ne!(message0, encrypted);
 
+        let mut bad_mac = mac;
+        bad_mac[0] ^= 0xFF;
+
         let mut message1 = encrypted.to_owned();
         {
             let mut meow = Meow::new(b"test protocol");
             meow.key(&key, false);
             meow.recv_clr(&nonce, false);
             meow.recv_enc(&mut message1, false);
-            assert!(meow.recv_mac(&mut mac).is_ok());
+            assert!(meow.clone().recv_mac(&mut mac).is_ok());
+            assert!(meow.clone().recv_mac(&mut bad_mac).is_err());
         };
 
         assert_eq!(message0, message1);
