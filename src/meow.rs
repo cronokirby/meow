@@ -28,14 +28,24 @@ const FLAG_M: Flags = 0b00010000;
 // Keytree flag. It's a mystery.
 const FLAG_K: Flags = 0b00100000;
 
+/// Represents the role of a participant.
+///
+/// This allows one state sending data and another state receiving data to come
+/// to the same result. Each of them modifies their role to be either the initiator
+/// or the responder, and this allows their state to be synchronized, since
+/// both parties agree on their respective roles.
 #[derive(Clone, Copy, Debug, PartialEq, Zeroize)]
 #[repr(u8)]
 enum Role {
+    /// We don't know which role we play yet.
     Undecided = 2,
+    // We're the first person to send a message.
     Initiator = 0,
+    // We're the first person to receive a message.
     Responder = 1,
 }
 
+// We also need to be able to convert roles to flags, to include in our state updates.
 impl Role {
     fn to_flag(self) -> Flags {
         match self {
@@ -218,6 +228,8 @@ impl Meow {
         self.pos_begin = 0;
     }
 
+    /// Move our writing position forward, possibly running the permutation
+    /// if we run out of space.
     #[inline(always)]
     fn advance_pos(&mut self) {
         self.pos += 1;
@@ -234,6 +246,7 @@ impl Meow {
         }
     }
 
+    /// Absorb data into the sponge, and the set the data to the resulting output.
     fn absorb_and_set(&mut self, data: &mut [u8]) {
         for b in data {
             self.state[self.pos as usize] ^= *b;
@@ -242,6 +255,7 @@ impl Meow {
         }
     }
 
+    /// Overwrite bytes of the state with this data.
     fn overwrite(&mut self, data: &[u8]) {
         for &b in data {
             self.state[self.pos as usize] = b;
@@ -249,6 +263,9 @@ impl Meow {
         }
     }
 
+    /// Zero out bytes of the state.
+    ///
+    /// A special case of `overwrite`.
     fn zero_out(&mut self, len: usize) {
         for _ in 0..len {
             self.state[self.pos as usize] = 0;
@@ -256,6 +273,17 @@ impl Meow {
         }
     }
 
+    /// Exchange data with the state.
+    ///
+    /// Basically, the data gets xored with the state, and then the state
+    /// gets set to the initial value of the data.
+    ///
+    /// This is mainly useful when decrypting. There, you want to xor the
+    /// state to turn the ciphertext into the plaintext, but you then want
+    /// to commit to the ciphertext inside of the state, like the sender did.
+    ///
+    /// You can accomplish this by setting the state to the initial value of the data,
+    /// which was the ciphertext.
     fn exchange(&mut self, data: &mut [u8]) {
         for b in data {
             let pos = self.pos as usize;
@@ -265,6 +293,7 @@ impl Meow {
         }
     }
 
+    /// Copy bytes from the state.
     fn copy(&mut self, data: &mut [u8]) {
         for b in data {
             let pos = self.pos as usize;
@@ -273,6 +302,12 @@ impl Meow {
         }
     }
 
+    /// Squeeze bytes from the state.
+    ///
+    /// The difference with `copy` is that the operation is "destructive",
+    /// overwriting data with 0. This can provide some forward secrecy,
+    /// which is why we prefer this operation for extracting randomness
+    /// from the state.
     fn squeeze(&mut self, data: &mut [u8]) {
         for b in data {
             let pos = self.pos as usize;
