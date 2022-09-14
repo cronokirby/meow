@@ -1,3 +1,5 @@
+use core::fmt;
+
 // See: https://strobe.sourceforge.io/specs for the specification for STROBE.
 use crate::kitten::{AlignedKittenState, STATE_SIZE_U8};
 use subtle::{Choice, ConstantTimeEq};
@@ -54,8 +56,15 @@ impl From<u8> for Role {
     }
 }
 
+/// A generic error to signal that MAC verification failed.
 #[derive(Clone, Copy, Debug)]
 pub struct MacError;
+
+impl fmt::Display for MacError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "MAC failed to verify.")
+    }
+}
 
 fn check_zero(data: &[u8]) -> Result<(), MacError> {
     let mut ok = Choice::from(1);
