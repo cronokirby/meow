@@ -1,4 +1,4 @@
-# Meow
+# Meow [![](https://img.shields.io/crates/v/ck-meow.svg)](https://crates.io/crates/ck-meow) [![](https://img.shields.io/badge/dynamic/json.svg?label=docs&uri=https%3A%2F%2Fcrates.io%2Fapi%2Fv1%2Fcrates%ck-meow%2Fversions&query=%24.versions%5B0%5D.num&colorB=4F74A6)](https://docs.rs/ck-meow)
 
 <p align="center">
   <img src="logo.jpg" style="width: 40%">
@@ -38,7 +38,7 @@
  seeds it with a key, and then either sends or receives a message.
 
  ```rust
- use meow::Meow;
+ use ck_meow::Meow;
 
  let key = [0xFF; 32];
 
@@ -62,7 +62,7 @@
  It's also very easy to add a nonce to the encryption scheme:
 
  ```rust
- use meow::Meow;
+ use ck_meow::Meow;
 
  let key = [0xFF; 32];
  let nonce = [0xAA; 32];
@@ -94,7 +94,7 @@
  and check MACs.
 
  ```rust
- use meow::Meow;
+ use ck_meow::Meow;
 
  let key = [0xFF; 32];
  let nonce = [0xAA; 32];
@@ -131,7 +131,7 @@
  It's also possible to use Meow as a very simple hash function:
 
  ```rust
- use meow::Meow;
+ use ck_meow::Meow;
  
  let mut meow = Meow::new(b"my hash function");
  meow.ad(b"big data", false);
@@ -154,7 +154,7 @@
  for making interactive public coin protocols non-interactive:
 
  ```rust
- use meow::Meow;
+ use ck_meow::Meow;
  
  let mut meow = Meow::new(b"my protocol");
  meow.ad(b"some data", false);

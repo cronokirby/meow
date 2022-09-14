@@ -32,7 +32,7 @@
 //! seeds it with a key, and then either sends or receives a message.
 //!
 //! ```rust
-//! use meow::Meow;
+//! use ck_meow::Meow;
 //!
 //! let key = [0xFF; 32];
 //!
@@ -56,7 +56,7 @@
 //! It's also very easy to add a nonce to the encryption scheme:
 //!
 //! ```rust
-//! use meow::Meow;
+//! use ck_meow::Meow;
 //!
 //! let key = [0xFF; 32];
 //! let nonce = [0xAA; 32];
@@ -88,7 +88,7 @@
 //! and check MACs.
 
 //! ```rust
-//! use meow::Meow;
+//! use ck_meow::Meow;
 //!
 //! let key = [0xFF; 32];
 //! let nonce = [0xAA; 32];
@@ -125,7 +125,7 @@
 //! It's also possible to use Meow as a very simple hash function:
 //!
 //! ```rust
-//! use meow::Meow;
+//! use ck_meow::Meow;
 //! 
 //! let mut meow = Meow::new(b"my hash function");
 //! meow.ad(b"big data", false);
@@ -148,7 +148,7 @@
 //! for making interactive public coin protocols non-interactive:
 //!
 //! ```rust
-//! use meow::Meow;
+//! use ck_meow::Meow;
 //! 
 //! let mut meow = Meow::new(b"my protocol");
 //! meow.ad(b"some data", false);
