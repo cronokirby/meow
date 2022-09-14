@@ -88,6 +88,41 @@ fn check_zero(data: &[u8]) -> Result<(), MacError> {
     }
 }
 
+/// Represents the state of a Meow instance.
+///
+/// This is the main object you interact with when using Meow, and all of
+/// the functionalities of the framework are derived from methods on this
+/// object.
+///
+/// The basic idea is that each party creates their own local instance
+/// of Meow, and then performs various operations in sync, allowing them
+/// to hash data, encrypt it, verify its integrity, etc.
+///
+/// This crate contains examples of composite operations like that in its
+/// main documentation.
+///
+/// This object is cloneable, and that's very useful in certain situations,
+/// but one should be careful that the states are identical, and so some operations
+/// may not be secure because of common randomness between the states.
+///
+/// For example, the PRF output from both states will be the same right
+/// after forking them.
+///
+/// Many operations are divided into `send` and `recv` pairs. The idea is that
+/// one party performs `send`, sends some data, and then the other party uses
+/// `recv` with this data.
+///
+/// Many operations have a `meta` variant. These variants basically do the
+/// same thing as their normal variants, but have a bit of domain separation
+/// so that their result is separate.
+/// 
+/// Many operations also have a `more` argument. This can be used to split up
+/// an operation over multiple calls. For example, you might want to encrypt
+/// 1 GB of data as a single logical operation, but without having to store
+/// this entire piece of data in memory. Using `more` allows you to do this chunk
+/// by chunk, as if it were a single large operation. Each call after the first
+/// would set `more = true`, in order to indicate that it's a continuation
+/// of the previous call.
 #[cfg_attr(test, derive(Debug))]
 #[derive(Clone, ZeroizeOnDrop)]
 pub struct Meow {
@@ -99,6 +134,10 @@ pub struct Meow {
 }
 
 impl Meow {
+    /// Create a new Meow instance.
+    ///
+    /// This function takes in a protocol string, which gets hashed into the state.
+    /// The intention is to use this for domain separation of different protocols based on Meow.
     pub fn new(protocol: &[u8]) -> Self {
         let mut state = AlignedKittenState([0u8; STATE_SIZE_U8]);
         // "5.1:
@@ -125,92 +164,176 @@ impl Meow {
         out
     }
 
+    /// Absorb additional data into this state.
+    ///
+    /// This can be used as a way to hash in additional data, such as when
+    /// implementing an AEAD, or just a simple hash function.
+    ///
+    /// The semantics of this are also that each party already knows the data,
+    /// and doesn't have to send it to the other person.
     pub fn ad(&mut self, data: &[u8], more: bool) {
         self.begin_op(FLAG_A, more);
         self.absorb(data);
     }
 
+    /// Absorb additional metadata into this state.
+    ///
+    /// This is intended to be used to describe additional data, or for
+    /// framing: describing the operations being done.
     pub fn meta_ad(&mut self, data: &[u8], more: bool) {
         self.begin_op(FLAG_M | FLAG_A, more);
         self.absorb(data);
     }
 
+    /// Include a secret key into the state.
+    ///
+    /// This makes further operations dependent on knowing this secret key.
+    ///
+    /// For forward secrecy, the state is also ratcheted.
     pub fn key(&mut self, data: &[u8], more: bool) {
         self.begin_op(FLAG_A | FLAG_C, more);
         self.overwrite(data);
     }
 
+    /// Send some plaintext data to the other party.
+    ///
+    /// This is similar to `ad`, except the semantics are that the other person
+    /// will not already know this information, and so we additionally have
+    /// to send it to them.
     pub fn send_clr(&mut self, data: &[u8], more: bool) {
         self.begin_op(FLAG_A | FLAG_T, more);
         self.absorb(data);
     }
 
+    /// Send some plaintext metadata to the other party.
+    ///
+    /// Similarly to `send_clr`, the semantics are that the other party doesn't
+    /// know this information, and we need to send it to them.
     pub fn meta_send_clr(&mut self, data: &[u8], more: bool) {
         self.begin_op(FLAG_M | FLAG_A | FLAG_T, more);
         self.absorb(data);
     }
 
+    /// Receive plaintext data.
+    /// 
+    /// This is the counterpart to `send_clr`.
     pub fn recv_clr(&mut self, data: &[u8], more: bool) {
         self.begin_op(FLAG_I | FLAG_A | FLAG_T, more);
         self.absorb(data);
     }
 
+    /// Receive plaintext metadata.
+    /// 
+    /// This is the counterpart to `meta_recv_clr`.
     pub fn meta_recv_clr(&mut self, data: &[u8], more: bool) {
         self.begin_op(FLAG_M | FLAG_I | FLAG_A | FLAG_T, more);
         self.absorb(data);
     }
 
+    /// Send encrypted data.
+    /// 
+    /// This function takes in the plaintext data to encrypt, and modifies
+    /// it in place to contain the encrypted data. This should then be sent
+    /// to the other party.
     pub fn send_enc(&mut self, data: &mut [u8], more: bool) {
         self.begin_op(FLAG_A | FLAG_C | FLAG_T, more);
         self.absorb_and_set(data);
     }
 
+    /// Send encrypted metadata.
+    /// 
+    /// The intention of this operation is to send encrypted framing data,
+    /// which might be useful for some situations.
     pub fn meta_send_enc(&mut self, data: &mut [u8], more: bool) {
         self.begin_op(FLAG_M | FLAG_A | FLAG_C | FLAG_T, more);
         self.absorb_and_set(data);
     }
 
+    /// Receive encrypted data.
+    /// 
+    /// This is the counterpart to `send_enc`.
+    /// 
+    /// We start with a buffer of encrypted data, and then modify it to contain
+    /// the plaintext.
     pub fn recv_enc(&mut self, data: &mut [u8], more: bool) {
         self.begin_op(FLAG_I | FLAG_A | FLAG_C | FLAG_T, more);
         self.exchange(data);
     }
 
+    /// Received encrypted metadata.
     pub fn meta_recv_enc(&mut self, data: &mut [u8], more: bool) {
         self.begin_op(FLAG_M | FLAG_I | FLAG_A | FLAG_C | FLAG_T, more);
         self.exchange(data);
     }
 
+    /// Send a MAC to the other party.
+    /// 
+    /// The buffer will be filled with a MAC, which verifies the integrity
+    /// of the operations done so far. This MAC is then intended to be sent
+    /// to the other party.
+    /// 
+    /// This operation intentionally does not allow `more` to be used. This
+    /// is to match `recv_mac`.
     pub fn send_mac(&mut self, data: &mut [u8]) {
         self.begin_op(FLAG_C | FLAG_T, false);
         self.copy(data);
     }
 
+    /// Send a MAC of metadata to the other party.
+    /// 
+    /// This is very similar to `send_mac`.
     pub fn meta_send_mac(&mut self, data: &mut [u8]) {
         self.begin_op(FLAG_M | FLAG_C | FLAG_T, false);
         self.copy(data);
     }
 
+    /// Receive and verify a MAC.
+    /// 
+    /// The buffer contains the MAC to verify, and we need to mutate it
+    /// to be able to more conveniently check its correctness.
+    /// 
+    /// This operation intentionally does not allow `more` to be used. This
+    /// is because a MAC should always be verified all at once, rather than in chunks.
     pub fn recv_mac(&mut self, data: &mut [u8]) -> Result<(), MacError> {
         self.begin_op(FLAG_I | FLAG_C | FLAG_T, false);
         self.exchange(data);
         check_zero(data)
     }
 
+    /// Receive and verify a MAC of metadata.
+    /// 
+    /// This is very similar to `recv_mac`.
     pub fn meta_recv_mac(&mut self, data: &mut [u8]) -> Result<(), MacError> {
         self.begin_op(FLAG_M | FLAG_I | FLAG_C | FLAG_T, false);
         self.exchange(data);
         check_zero(data)
     }
 
+    /// Generate random bytes from the state.
     pub fn prf(&mut self, data: &mut [u8], more: bool) {
         self.begin_op(FLAG_I | FLAG_A | FLAG_C, more);
         self.squeeze(data);
     }
 
+    /// Ratchet the state forward.
+    /// 
+    /// Because the state is modified with a permutation, we can use new states
+    /// to derive information about old states. Ratcheting prevents this flow
+    /// of information backwards.
     pub fn ratchet(&mut self) {
         self.ratchet_many(SECURITY_PARAM / 8, false)
     }
 
+    /// Ratchet the state forward many times.
+    /// 
+    /// The difference with `ratchet` is that you can specify how far to ratchet
+    /// the state. For `S` bits of security, you want to ratchet at least `S / 8`
+    /// bytes. Ratcheting more can function as a kind of "difficulty", like
+    /// you might want for password hashing.
+    /// 
+    /// That said, you probably want a function dedicated for hashing passwords,
+    /// which have other security features, like being memory hard, and things like
+    /// that.
     pub fn ratchet_many(&mut self, len: usize, more: bool) {
         self.begin_op(FLAG_C, more);
         self.zero_out(len);
