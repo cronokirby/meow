@@ -15,6 +15,8 @@ use proptest::{collection::vec, prelude::*};
 enum Command {
     /// Add additional data into the state.
     Ad(Vec<u8>),
+    /// Add a secret key into the state.
+    Key(Vec<u8>),
     /// Send a plaintext message to the other party.
     Clr(bool, Vec<u8>),
     /// Send an encrypted message to the other party.
@@ -57,6 +59,10 @@ fn run_and_assert_commands(commands: &Commands) -> Vec<u8> {
             Command::Ad(data) => {
                 meow0.ad(data, false);
                 meow1.ad(data, false);
+            }
+            Command::Key(key) => {
+                meow0.key(key, false);
+                meow1.key(key, false);
             }
             Command::Clr(swap, plaintext) => {
                 if *swap {
@@ -118,6 +124,7 @@ fn arb_command() -> impl Strategy<Value = Command> {
 
     prop_oneof![
         arb_data().prop_map(Ad),
+        arb_data().prop_map(Key),
         arb_bool_and_data().prop_map(|(s, d)| Clr(s, d)),
         arb_bool_and_data().prop_map(|(s, d)| Enc(s, d)),
         Just(Prf(32)),
@@ -127,7 +134,7 @@ fn arb_command() -> impl Strategy<Value = Command> {
 }
 
 prop_compose! {
-    fn arb_commands()(protocol in arb_data(), commands in vec(arb_command(), 0..32)) -> Commands {
+    fn arb_commands()(protocol in arb_data(), commands in vec(arb_command(), 0..62)) -> Commands {
         Commands { protocol, commands }
     }
 }
