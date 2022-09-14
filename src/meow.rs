@@ -414,4 +414,24 @@ mod test {
 
         assert_ne!(hash0, hash1);
     }
+
+    #[test]
+    fn test_streaming() {
+        let mut hash0 = [0u8; 32];
+        {
+            let mut meow = Meow::new(b"test protocol");
+            meow.ad(b"hello world!", false);
+            meow.prf(&mut hash0, false);
+        }
+
+        let mut hash1 = [0u8; 32];
+        {
+            let mut meow = Meow::new(b"test protocol");
+            meow.ad(b"hello", false);
+            meow.ad(b" world!", true);
+            meow.prf(&mut hash1, false);
+        }
+
+        assert_eq!(hash0, hash1);
+    }
 }
