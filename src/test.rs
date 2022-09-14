@@ -1,22 +1,48 @@
+// The basic idea of this module is to perform a kind of fuzz testing of our implementation.
+// This testing works by generating a random transcript of commands, and then
+// simulating a protocol execution between two parties.
+// This allows us to exercise some basic properties, like that the parties
+// should agree on what's being communicated, and their states should be synchronized,
+// but also more complicated things, like it being impossible to generate two transcripts
+// which create a "collision" in terms of their hash outputs.
 use crate::meow::Meow;
 use proptest::{collection::vec, prelude::*};
 
+/// Represents a single command in the protocol.
+///
+/// Each command basically represents an operation we can do with our instance.
 #[derive(Clone, Debug, PartialEq)]
 enum Command {
+    /// Add additional data into the state.
     Ad(Vec<u8>),
+    /// Send a plaintext message to the other party.
     Clr(bool, Vec<u8>),
+    /// Send an encrypted message to the other party.
     Enc(bool, Vec<u8>),
+    /// Generate some bytes of random output.
     Prf(usize),
+    /// Send a MAC of a certain length to the other party.
     Mac(usize),
     Ratchet,
 }
 
+/// Represents a full protocol transcript.
 #[derive(Clone, Debug, PartialEq)]
 struct Commands {
+    /// The protocol string.
     protocol: Vec<u8>,
+    /// A list of commands.
     commands: Vec<Command>,
 }
 
+/// Simulate a protocol execution, given a transcript of commands.
+///
+/// We do this by setting up two Meow states, with each command updating the states.
+/// In essence, the sequence of commands determines a protocol where two parties
+/// communicate together, and use the PRF commands to generate random output.
+///
+/// This simulation verifies that the communication is consistent, via assertions,
+/// and then returns the PRF output generated throughout the protocol.
 fn run_and_assert_commands(commands: &Commands) -> Vec<u8> {
     let mut prf_out = Vec::new();
     let mut prf_pos = 0;
