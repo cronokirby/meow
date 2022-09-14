@@ -320,7 +320,7 @@ mod test {
             let mut meow = Meow::new(b"test protocol");
             meow.key(&key, false);
             meow.send_enc(&mut encrypted, false);
-        };
+        }
 
         assert_ne!(message0, encrypted);
 
@@ -329,7 +329,7 @@ mod test {
             let mut meow = Meow::new(b"test protocol");
             meow.key(&key, false);
             meow.recv_enc(&mut message1, false);
-        };
+        }
 
         assert_eq!(message0, message1);
     }
@@ -346,7 +346,7 @@ mod test {
             meow.key(&key, false);
             meow.send_clr(&nonce, false);
             meow.send_enc(&mut encrypted, false);
-        };
+        }
 
         assert_ne!(message0, encrypted);
 
@@ -356,7 +356,7 @@ mod test {
             meow.key(&key, false);
             meow.recv_clr(&nonce, false);
             meow.recv_enc(&mut message1, false);
-        };
+        }
 
         assert_eq!(message0, message1);
     }
@@ -376,7 +376,7 @@ mod test {
             meow.send_clr(&nonce, false);
             meow.send_enc(&mut encrypted, false);
             meow.send_mac(&mut mac);
-        };
+        }
 
         assert_ne!(message0, encrypted);
 
@@ -391,7 +391,7 @@ mod test {
             meow.recv_enc(&mut message1, false);
             assert!(meow.clone().recv_mac(&mut mac).is_ok());
             assert!(meow.clone().recv_mac(&mut bad_mac).is_err());
-        };
+        }
 
         assert_eq!(message0, message1);
     }
@@ -403,14 +403,14 @@ mod test {
             let mut meow = Meow::new(b"test protocol");
             meow.ad(b"hello A", false);
             meow.prf(&mut hash0, false);
-        };
+        }
 
         let mut hash1 = [0u8; 32];
         {
             let mut meow = Meow::new(b"test protocol");
             meow.ad(b"hello B", false);
             meow.prf(&mut hash1, false);
-        };
+        }
 
         assert_ne!(hash0, hash1);
     }
