@@ -115,7 +115,7 @@ fn check_zero(data: &[u8]) -> Result<(), MacError> {
 /// Many operations have a `meta` variant. These variants basically do the
 /// same thing as their normal variants, but have a bit of domain separation
 /// so that their result is separate.
-/// 
+///
 /// Many operations also have a `more` argument. This can be used to split up
 /// an operation over multiple calls. For example, you might want to encrypt
 /// 1 GB of data as a single logical operation, but without having to store
@@ -215,7 +215,7 @@ impl Meow {
     }
 
     /// Receive plaintext data.
-    /// 
+    ///
     /// This is the counterpart to `send_clr`.
     pub fn recv_clr(&mut self, data: &[u8], more: bool) {
         self.begin_op(FLAG_I | FLAG_A | FLAG_T, more);
@@ -223,7 +223,7 @@ impl Meow {
     }
 
     /// Receive plaintext metadata.
-    /// 
+    ///
     /// This is the counterpart to `meta_recv_clr`.
     pub fn meta_recv_clr(&mut self, data: &[u8], more: bool) {
         self.begin_op(FLAG_M | FLAG_I | FLAG_A | FLAG_T, more);
@@ -231,7 +231,7 @@ impl Meow {
     }
 
     /// Send encrypted data.
-    /// 
+    ///
     /// This function takes in the plaintext data to encrypt, and modifies
     /// it in place to contain the encrypted data. This should then be sent
     /// to the other party.
@@ -241,7 +241,7 @@ impl Meow {
     }
 
     /// Send encrypted metadata.
-    /// 
+    ///
     /// The intention of this operation is to send encrypted framing data,
     /// which might be useful for some situations.
     pub fn meta_send_enc(&mut self, data: &mut [u8], more: bool) {
@@ -250,9 +250,9 @@ impl Meow {
     }
 
     /// Receive encrypted data.
-    /// 
+    ///
     /// This is the counterpart to `send_enc`.
-    /// 
+    ///
     /// We start with a buffer of encrypted data, and then modify it to contain
     /// the plaintext.
     pub fn recv_enc(&mut self, data: &mut [u8], more: bool) {
@@ -267,11 +267,11 @@ impl Meow {
     }
 
     /// Send a MAC to the other party.
-    /// 
+    ///
     /// The buffer will be filled with a MAC, which verifies the integrity
     /// of the operations done so far. This MAC is then intended to be sent
     /// to the other party.
-    /// 
+    ///
     /// This operation intentionally does not allow `more` to be used. This
     /// is to match `recv_mac`.
     pub fn send_mac(&mut self, data: &mut [u8]) {
@@ -280,7 +280,7 @@ impl Meow {
     }
 
     /// Send a MAC of metadata to the other party.
-    /// 
+    ///
     /// This is very similar to `send_mac`.
     pub fn meta_send_mac(&mut self, data: &mut [u8]) {
         self.begin_op(FLAG_M | FLAG_C | FLAG_T, false);
@@ -288,10 +288,10 @@ impl Meow {
     }
 
     /// Receive and verify a MAC.
-    /// 
+    ///
     /// The buffer contains the MAC to verify, and we need to mutate it
     /// to be able to more conveniently check its correctness.
-    /// 
+    ///
     /// This operation intentionally does not allow `more` to be used. This
     /// is because a MAC should always be verified all at once, rather than in chunks.
     pub fn recv_mac(&mut self, data: &mut [u8]) -> Result<(), MacError> {
@@ -301,7 +301,7 @@ impl Meow {
     }
 
     /// Receive and verify a MAC of metadata.
-    /// 
+    ///
     /// This is very similar to `recv_mac`.
     pub fn meta_recv_mac(&mut self, data: &mut [u8]) -> Result<(), MacError> {
         self.begin_op(FLAG_M | FLAG_I | FLAG_C | FLAG_T, false);
@@ -316,7 +316,7 @@ impl Meow {
     }
 
     /// Ratchet the state forward.
-    /// 
+    ///
     /// Because the state is modified with a permutation, we can use new states
     /// to derive information about old states. Ratcheting prevents this flow
     /// of information backwards.
@@ -325,12 +325,12 @@ impl Meow {
     }
 
     /// Ratchet the state forward many times.
-    /// 
+    ///
     /// The difference with `ratchet` is that you can specify how far to ratchet
     /// the state. For `S` bits of security, you want to ratchet at least `S / 8`
     /// bytes. Ratcheting more can function as a kind of "difficulty", like
     /// you might want for password hashing.
-    /// 
+    ///
     /// That said, you probably want a function dedicated for hashing passwords,
     /// which have other security features, like being memory hard, and things like
     /// that.
