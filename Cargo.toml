@@ -1,7 +1,11 @@
 [package]
 name = "ck-meow"
+description = "An implementation of STROBE using KitTen"
+license-file = "LICENSE"
+repository = "https://github.com/cronokirby/meow"
 version = "0.1.0"
 edition = "2021"
+
 
 [dependencies]
 keccak = "0.1.2"
